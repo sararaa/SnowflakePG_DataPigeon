@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
-import requests
-import json
-from typing import Dict, List, Any
 import os
+from typing import Dict, List, Any
+import snowflake.connector
+from snowflake.connector import DictCursor
 
 # Page configuration
 st.set_page_config(
@@ -46,22 +46,54 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# API Configuration
-API_BASE_URL = "http://localhost:3003/api"
+# Snowflake Configuration
+def get_snowflake_config():
+    """Get Snowflake configuration from environment variables or Streamlit secrets"""
+    # Try Streamlit secrets first (for cloud deployment)
+    try:
+        return {
+            'account': st.secrets['SNOWFLAKE_ACCOUNT'],
+            'user': st.secrets['SNOWFLAKE_USERNAME'],
+            'password': st.secrets['SNOWFLAKE_PASSWORD'],
+            'database': st.secrets['SNOWFLAKE_DATABASE'],
+            'schema': st.secrets.get('SNOWFLAKE_SCHEMA', 'PUBLIC'),
+            'warehouse': st.secrets['SNOWFLAKE_WAREHOUSE'],
+            'role': st.secrets.get('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
+        }
+    except:
+        # Fall back to environment variables (for local development)
+        return {
+            'account': os.getenv('SNOWFLAKE_ACCOUNT'),
+            'user': os.getenv('SNOWFLAKE_USERNAME'),
+            'password': os.getenv('SNOWFLAKE_PASSWORD'),
+            'database': os.getenv('SNOWFLAKE_DATABASE'),
+            'schema': os.getenv('SNOWFLAKE_SCHEMA', 'PUBLIC'),
+            'warehouse': os.getenv('SNOWFLAKE_WAREHOUSE'),
+            'role': os.getenv('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
+        }
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def fetch_charger_data():
-    """Fetch charger data from the API"""
+    """Fetch charger data directly from Snowflake"""
     try:
-        response = requests.get(f"{API_BASE_URL}/chargers", timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('data', [])
-        else:
-            st.error(f"API Error: {response.status_code}")
-            return []
+        # Get configuration
+        config = get_snowflake_config()
+        
+        # Create connection
+        conn = snowflake.connector.connect(**config)
+        cursor = conn.cursor(DictCursor)
+        
+        # Execute query
+        cursor.execute("SELECT * FROM CHARGERS")
+        results = cursor.fetchall()
+        
+        # Close connection
+        cursor.close()
+        conn.close()
+        
+        return results
     except Exception as e:
-        st.error(f"Failed to fetch data: {str(e)}")
+        st.error(f"Failed to connect to Snowflake: {str(e)}")
         return []
 
 def calculate_metrics(chargers: List[Dict]) -> Dict[str, Any]:
@@ -155,12 +187,28 @@ def main():
     # Header
     st.markdown('<h1 class="main-header">⚡ EV Charging Platform</h1>', unsafe_allow_html=True)
     
+    # Check configuration
+    config = get_snowflake_config()
+    missing_vars = [key for key, value in config.items() if not value]
+    if missing_vars:
+        st.error(f"Missing configuration: {', '.join(missing_vars)}")
+        st.info("Please set the following in your deployment platform:")
+        st.code("""
+# For Streamlit Cloud, add to secrets:
+SNOWFLAKE_ACCOUNT = "your_account"
+SNOWFLAKE_USERNAME = "your_username"
+SNOWFLAKE_PASSWORD = "your_password"
+SNOWFLAKE_DATABASE = "your_database"
+SNOWFLAKE_WAREHOUSE = "your_warehouse"
+        """)
+        return
+    
     # Fetch data
-    with st.spinner('Loading charger data...'):
+    with st.spinner('Loading charger data from Snowflake...'):
         chargers = fetch_charger_data()
     
     if not chargers:
-        st.error("No charger data available. Please check your API connection.")
+        st.error("No charger data available. Please check your Snowflake connection.")
         return
     
     # Calculate metrics
