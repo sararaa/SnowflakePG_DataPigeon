@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, AlertCircle, Info, XCircle, Check } from 'lucide-react';
-import { supabase, Alert, Charger } from '@/lib/supabase';
+import { snowflake } from '@/lib/snowflake';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -37,9 +37,7 @@ const SEVERITY_CONFIG = {
 };
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<(Alert & { charger: Charger | null })[]>(
-    []
-  );
+  const [alerts, setAlerts] = useState<any[]>([]);
   const [filter, setFilter] = useState<string>('all');
 
   useEffect(() => {
@@ -47,26 +45,40 @@ export default function AlertsPage() {
   }, []);
 
   const fetchAlerts = async () => {
-    const { data } = await supabase
-      .from('alerts')
-      .select('*, charger:chargers(*)')
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      setAlerts(data as any);
+    try {
+      // For now, create some sample alerts based on charger data
+      const response = await fetch('/api/chargers');
+      const result = await response.json();
+      
+      if (result.data && result.data.length > 0) {
+        const chargers = result.data;
+        // Create sample alerts based on charger data
+        const sampleAlerts = chargers.slice(0, 5).map((charger: any, index: number) => ({
+          id: `alert_${index}`,
+          charger_id: charger.CHARGER_ID,
+          severity: index % 3 === 0 ? 'WARNING' : index % 3 === 1 ? 'INFO' : 'ERROR',
+          message: index % 3 === 0 ? 'Firmware update available' : 
+                   index % 3 === 1 ? 'Charger operating normally' : 
+                   'Maintenance required',
+          acknowledged: false,
+          created_at: new Date().toISOString(),
+          charger: {
+            charger_id: charger.CHARGER_ID
+          }
+        }));
+        setAlerts(sampleAlerts);
+      }
+    } catch (error) {
+      console.error('Error fetching alerts data:', error);
     }
   };
 
   const acknowledgeAlert = async (alertId: string) => {
-    const { error } = await supabase
-      .from('alerts')
-      .update({ acknowledged: true })
-      .eq('id', alertId);
-
-    if (!error) {
-      toast.success('Alert acknowledged');
-      fetchAlerts();
-    }
+    // For now, just mark as acknowledged locally
+    setAlerts(prev => prev.map(alert => 
+      alert.id === alertId ? { ...alert, acknowledged: true } : alert
+    ));
+    toast.success('Alert acknowledged');
   };
 
   const filteredAlerts = alerts.filter((alert) => {

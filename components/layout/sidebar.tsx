@@ -7,10 +7,8 @@ import { useAppStore } from '@/lib/store';
 import {
   LayoutDashboard,
   MapPin,
+  Battery,
   Ticket,
-  BarChart3,
-  Brain,
-  Activity,
   Bell,
   Zap,
 } from 'lucide-react';
@@ -29,24 +27,14 @@ const navItems = [
     icon: MapPin,
   },
   {
+    title: 'Sessions',
+    href: '/sessions',
+    icon: Battery,
+  },
+  {
     title: 'Tickets',
     href: '/tickets',
     icon: Ticket,
-  },
-  {
-    title: 'Analytics',
-    href: '/analytics',
-    icon: BarChart3,
-  },
-  {
-    title: 'Predictive',
-    href: '/predictive',
-    icon: Brain,
-  },
-  {
-    title: 'Self-Healing',
-    href: '/self-healing',
-    icon: Activity,
   },
   {
     title: 'Alerts',
@@ -82,7 +70,7 @@ export function Sidebar() {
               <>
                 <Zap className="h-6 w-6 text-blue-500" />
                 <span className="font-bold text-lg bg-gradient-to-r from-blue-500 to-cyan-500 bg-clip-text text-transparent">
-                  EVCharge
+                  Pigeon
                 </span>
               </>
             )}
@@ -123,7 +111,7 @@ export function Sidebar() {
             {!sidebarCollapsed && (
               <div className="flex flex-col items-start text-sm">
                 <span className="font-medium">Demo User</span>
-                <span className="text-xs text-muted-foreground">admin@evcharge.io</span>
+                <span className="text-xs text-muted-foreground">admin@pigeon.io</span>
               </div>
             )}
           </Button>

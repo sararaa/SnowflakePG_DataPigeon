@@ -6,12 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MapPin, BatteryCharging, AlertCircle, Grid, List } from 'lucide-react';
-import { supabase, Site, Charger } from '@/lib/supabase';
+import { snowflake } from '@/lib/snowflake';
 
 export default function LocationsPage() {
-  const [sites, setSites] = useState<
-    (Site & { chargers: Charger[] })[]
-  >([]);
+  const [sites, setSites] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
@@ -19,41 +17,64 @@ export default function LocationsPage() {
   }, []);
 
   const fetchLocations = async () => {
-    const { data: sitesData } = await supabase.from('sites').select('*');
-    const { data: chargersData } = await supabase.from('chargers').select('*');
+    try {
+      const response = await fetch('/api/chargers');
+      const result = await response.json();
+      
+      if (result.data && result.data.length > 0) {
+        const chargersData = result.data;
+        // Group chargers by site
+        const siteMap = new Map();
+        
+        chargersData.forEach((charger: any) => {
+          const siteId = charger.SITE_ID;
+          if (!siteMap.has(siteId)) {
+            siteMap.set(siteId, {
+              id: siteId,
+              name: siteId === 'STN_SF_FERRY' ? 'San Francisco Ferry Terminal' : 
+                    siteId === 'STN_LA_EXPO' ? 'Los Angeles Expo Center' : 
+                    `Site ${siteId}`,
+              address: siteId === 'STN_SF_FERRY' ? 'San Francisco, CA' : 
+                       siteId === 'STN_LA_EXPO' ? 'Los Angeles, CA' : 
+                       `Location for ${siteId}`,
+              chargers: []
+            });
+          }
+          siteMap.get(siteId).chargers.push(charger);
+        });
 
-    if (sitesData && chargersData) {
-      const sitesWithChargers = sitesData.map((site) => ({
-        ...site,
-        chargers: chargersData.filter((c) => c.site_id === site.id),
-      }));
-      setSites(sitesWithChargers as any);
+        setSites(Array.from(siteMap.values()));
+      }
+    } catch (error) {
+      console.error('Error fetching locations data:', error);
     }
   };
 
-  const getLocationStatus = (chargers: Charger[]) => {
-    const critical = chargers.filter((c) => c.health_status === 'Critical').length;
-    const warning = chargers.filter((c) => c.health_status === 'Warning').length;
+  const getLocationStatus = (chargers: any[]) => {
+    const critical = chargers.filter((c) => c.STATUS_LAST_SEEN === 'Faulted' || c.STATUS_LAST_SEEN === 'Offline').length;
+    const warning = chargers.filter((c) => c.STATUS_LAST_SEEN === 'Maintenance').length;
 
     if (critical > 0) return { color: 'bg-red-500', label: 'Critical' };
     if (warning > 0) return { color: 'bg-yellow-500', label: 'Warning' };
     return { color: 'bg-green-500', label: 'Healthy' };
   };
 
-  const getStatusCounts = (chargers: Charger[]) => {
+  const getStatusCounts = (chargers: any[]) => {
     return {
       active: chargers.filter(
-        (c) => c.status === 'Available' || c.status === 'Charging'
+        (c) => c.STATUS_LAST_SEEN === 'Available' || c.STATUS_LAST_SEEN === 'Charging'
       ).length,
-      inactive: chargers.filter((c) => c.status === 'Offline').length,
-      faulted: chargers.filter((c) => c.status === 'Faulted').length,
+      inactive: chargers.filter((c) => c.STATUS_LAST_SEEN === 'Offline').length,
+      faulted: chargers.filter((c) => c.STATUS_LAST_SEEN === 'Faulted').length,
     };
   };
 
-  const getAverageUptime = (chargers: Charger[]) => {
+  const getAverageUptime = (chargers: any[]) => {
     if (chargers.length === 0) return 0;
-    const total = chargers.reduce((sum, c) => sum + c.uptime_percentage, 0);
-    return (total / chargers.length).toFixed(1);
+    const active = chargers.filter(
+      (c) => c.STATUS_LAST_SEEN === 'Available' || c.STATUS_LAST_SEEN === 'Charging'
+    ).length;
+    return ((active / chargers.length) * 100).toFixed(1);
   };
 
   return (

@@ -11,7 +11,7 @@ import { Toaster } from '@/components/ui/sonner';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'EVCharge - Predictive Maintenance Dashboard',
+  title: 'Pigeon - Predictive Maintenance Dashboard',
   description: 'Real-time EV charger monitoring and predictive maintenance platform',
 };
 

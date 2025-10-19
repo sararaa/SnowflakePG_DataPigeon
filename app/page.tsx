@@ -25,7 +25,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { supabase } from '@/lib/supabase';
+import { snowflake } from '@/lib/snowflake';
 import { motion } from 'framer-motion';
 
 const HEALTH_COLORS = {
@@ -42,6 +42,8 @@ export default function DashboardPage() {
     mtbf: 0,
     selfHealingRate: 0,
     criticalIssues: 0,
+    totalPower: 0,
+    sites: 0,
   });
 
   const [healthData, setHealthData] = useState<any[]>([]);
@@ -52,37 +54,59 @@ export default function DashboardPage() {
   }, []);
 
   const fetchDashboardData = async () => {
-    const { data: chargers } = await supabase.from('chargers').select('*');
+    try {
+      const response = await fetch('/api/chargers');
+      const result = await response.json();
+      
+      if (result.data && result.data.length > 0) {
+        const chargers = result.data;
+        const total = chargers.length;
+        const active = chargers.filter(
+          (c: any) => c.STATUS_LAST_SEEN === 'Available' || c.STATUS_LAST_SEEN === 'Charging'
+        ).length;
+        
+        // Calculate uptime based on status (simplified logic)
+        const avgUptime = (active / total) * 100;
 
-    if (chargers) {
-      const total = chargers.length;
-      const active = chargers.filter(
-        (c) => c.status === 'Available' || c.status === 'Charging'
-      ).length;
-      const avgUptime =
-        chargers.reduce((sum, c) => sum + c.uptime_percentage, 0) / total;
+        // Create health breakdown based on status
+        const healthBreakdown = chargers.reduce((acc: any, c: any) => {
+          const status = c.STATUS_LAST_SEEN;
+          let healthStatus = 'Healthy';
+          if (status === 'Faulted' || status === 'Offline') {
+            healthStatus = 'Critical';
+          } else if (status === 'Maintenance') {
+            healthStatus = 'Warning';
+          }
+          acc[healthStatus] = (acc[healthStatus] || 0) + 1;
+          return acc;
+        }, {});
 
-      const healthBreakdown = chargers.reduce((acc: any, c) => {
-        acc[c.health_status] = (acc[c.health_status] || 0) + 1;
-        return acc;
-      }, {});
+        const healthChartData = Object.entries(healthBreakdown).map(([name, value]) => ({
+          name,
+          value,
+          color: HEALTH_COLORS[name as keyof typeof HEALTH_COLORS],
+        }));
 
-      const healthChartData = Object.entries(healthBreakdown).map(([name, value]) => ({
-        name,
-        value,
-        color: HEALTH_COLORS[name as keyof typeof HEALTH_COLORS],
-      }));
+        // Calculate additional stats from real data
+        const totalPower = chargers.reduce((sum: number, c: any) => sum + (c.MAX_POWER_KW || 0), 0);
+        const avgPower = totalPower / total;
+        const sites = [...new Set(chargers.map((c: any) => c.SITE_ID))].length;
+        
+        setStats({
+          totalChargers: total,
+          activeChargers: active,
+          uptime: avgUptime,
+          mtbf: 168,
+          selfHealingRate: 87.5,
+          criticalIssues: healthBreakdown.Critical || 0,
+          totalPower: Math.round(totalPower),
+          sites: sites,
+        });
 
-      setStats({
-        totalChargers: total,
-        activeChargers: active,
-        uptime: avgUptime,
-        mtbf: 168,
-        selfHealingRate: 87.5,
-        criticalIssues: healthBreakdown.Critical || 0,
-      });
-
-      setHealthData(healthChartData);
+        setHealthData(healthChartData);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
     }
 
     const sessionsChartData = Array.from({ length: 7 }, (_, i) => {
@@ -134,6 +158,20 @@ export default function DashboardPage() {
       icon: AlertTriangle,
       color: 'text-red-500',
     },
+    {
+      title: 'Total Power Capacity',
+      value: `${stats.totalPower} kW`,
+      change: '+2.1%',
+      icon: Zap,
+      color: 'text-purple-500',
+    },
+    {
+      title: 'Active Sites',
+      value: stats.sites,
+      change: '+0%',
+      icon: BatteryCharging,
+      color: 'text-indigo-500',
+    },
   ];
 
   const containerVariants = {
@@ -169,7 +207,7 @@ export default function DashboardPage() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+        className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
       >
         {kpiCards.map((kpi) => (
           <motion.div key={kpi.title} variants={itemVariants}>

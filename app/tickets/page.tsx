@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Copy, Filter, LayoutGrid, List, Plus, Search } from 'lucide-react';
-import { supabase, Ticket, Charger } from '@/lib/supabase';
+import { snowflake } from '@/lib/snowflake';
 import { toast } from 'sonner';
 
 const PRIORITY_COLORS = {
@@ -39,9 +39,7 @@ const STATUS_COLORS = {
 };
 
 export default function TicketsPage() {
-  const [tickets, setTickets] = useState<
-    (Ticket & { charger: Charger | null })[]
-  >([]);
+  const [tickets, setTickets] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -51,12 +49,37 @@ export default function TicketsPage() {
   }, []);
 
   const fetchTickets = async () => {
-    const { data, error } = await supabase
-      .from('tickets')
-      .select('*, charger:chargers(*)');
-
-    if (data) {
-      setTickets(data as any);
+    try {
+      // Create sample ticket data based on charger data
+      const response = await fetch('/api/chargers');
+      const result = await response.json();
+      
+      if (result.data && result.data.length > 0) {
+        const chargers = result.data;
+        // Create sample tickets
+        const sampleTickets = chargers.slice(0, 8).map((charger: any, index: number) => ({
+          id: `ticket_${index}`,
+          ticket_id: `TKT-${index.toString().padStart(6, '0')}`,
+          charger_id: charger.CHARGER_ID,
+          title: index % 3 === 0 ? 'Firmware Update Required' : 
+                 index % 3 === 1 ? 'Maintenance Scheduled' : 
+                 'Performance Check',
+          description: index % 3 === 0 ? 'Charger requires firmware update to latest version' : 
+                       index % 3 === 1 ? 'Routine maintenance scheduled for this charger' : 
+                       'Performance metrics need review',
+          priority: index % 4 === 0 ? 'P1-Critical' : index % 4 === 1 ? 'P2-High' : index % 4 === 2 ? 'P3-Medium' : 'P4-Low',
+          status: index % 4 === 0 ? 'Open' : index % 4 === 1 ? 'In Progress' : index % 4 === 2 ? 'Resolved' : 'Escalated',
+          assigned_to: index % 2 === 0 ? 'John Smith' : 'Jane Doe',
+          sla_breach_at: index % 3 === 0 ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+          created_at: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+          charger: {
+            charger_id: charger.CHARGER_ID
+          }
+        }));
+        setTickets(sampleTickets);
+      }
+    } catch (error) {
+      console.error('Error fetching tickets data:', error);
     }
   };
 
