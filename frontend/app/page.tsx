@@ -90,7 +90,7 @@ export default function DashboardPage() {
         // Calculate additional stats from real data
         const totalPower = chargers.reduce((sum: number, c: any) => sum + (c.MAX_POWER_KW || 0), 0);
         const avgPower = totalPower / total;
-        const sites = [...new Set(chargers.map((c: any) => c.SITE_ID))].length;
+        const sites = Array.from(new Set(chargers.map((c: any) => c.SITE_ID))).length;
         
         setStats({
           totalChargers: total,
