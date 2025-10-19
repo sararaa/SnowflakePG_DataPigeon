@@ -35,11 +35,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# secrets and sensitive files
-*.log
+# Streamlit secrets
+.streamlit/secrets.toml
 .streamlit/
-secrets.toml
+
+# Snowflake logs
 snowflake.log
-*.pem
-*.key
-*.crt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
