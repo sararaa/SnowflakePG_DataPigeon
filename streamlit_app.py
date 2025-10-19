@@ -4,8 +4,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
-import snowflake.connector as sf
-from snowflake.connector import DictCursor
 import time
 
 # Page configuration
@@ -16,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS to match your Next.js design
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -44,57 +42,119 @@ st.markdown("""
     .status-faulted { color: #ef4444; font-weight: bold; }
     .status-offline { color: #6b7280; font-weight: bold; }
     .status-maintenance { color: #f59e0b; font-weight: bold; }
-    
-    .glassmorphism {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-    }
-    
-    .sidebar .sidebar-content {
-        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-    }
 </style>
 """, unsafe_allow_html=True)
 
-# Snowflake Configuration
-def get_snowflake_config():
-    try:
-        return {
-            'account': st.secrets['SNOWFLAKE_ACCOUNT'],
-            'user': st.secrets['SNOWFLAKE_USERNAME'],
-            'password': st.secrets['SNOWFLAKE_PASSWORD'],
-            'database': st.secrets['SNOWFLAKE_DATABASE'],
-            'schema': st.secrets.get('SNOWFLAKE_SCHEMA', 'PUBLIC'),
-            'warehouse': st.secrets['SNOWFLAKE_WAREHOUSE'],
-            'role': st.secrets.get('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
+# Sample data based on your Snowflake structure
+SAMPLE_CHARGERS = [
+    {
+        'CHARGER_ID': 'STN_SF_FERRY_CHG_01',
+        'SITE_ID': 'STN_SF_FERRY',
+        'MODEL': 'Terra184',
+        'FIRMWARE_VERSION': 'v1.0.4',
+        'VENDOR': 'ABB',
+        'INSTALL_DATE': '2024-09-01',
+        'NETWORK_TYPE': 'LTE',
+        'LOCATION_LAT': 37.7957980284918,
+        'LOCATION_LON': -122.3937829585807,
+        'NUM_CONNECTORS': 2,
+        'MAX_POWER_KW': 150,
+        'LAST_MAINTENANCE_DATE': '2024-12-05',
+        'STATUS_LAST_SEEN': 'Available'
+    },
+    {
+        'CHARGER_ID': 'STN_SF_FERRY_CHG_02',
+        'SITE_ID': 'STN_SF_FERRY',
+        'MODEL': 'Terra184',
+        'FIRMWARE_VERSION': 'v1.0.4',
+        'VENDOR': 'ABB',
+        'INSTALL_DATE': '2024-09-01',
+        'NETWORK_TYPE': 'LTE',
+        'LOCATION_LAT': 37.7957980284918,
+        'LOCATION_LON': -122.3937829585807,
+        'NUM_CONNECTORS': 2,
+        'MAX_POWER_KW': 150,
+        'LAST_MAINTENANCE_DATE': '2024-12-05',
+        'STATUS_LAST_SEEN': 'Charging'
+    },
+    {
+        'CHARGER_ID': 'STN_SF_FERRY_CHG_03',
+        'SITE_ID': 'STN_SF_FERRY',
+        'MODEL': 'Terra184',
+        'FIRMWARE_VERSION': 'v1.0.4',
+        'VENDOR': 'ABB',
+        'INSTALL_DATE': '2024-09-01',
+        'NETWORK_TYPE': 'LTE',
+        'LOCATION_LAT': 37.7957980284918,
+        'LOCATION_LON': -122.3937829585807,
+        'NUM_CONNECTORS': 2,
+        'MAX_POWER_KW': 150,
+        'LAST_MAINTENANCE_DATE': '2024-12-05',
+        'STATUS_LAST_SEEN': 'Faulted'
+    },
+    {
+        'CHARGER_ID': 'STN_LA_EXPO_CHG_01',
+        'SITE_ID': 'STN_LA_EXPO',
+        'MODEL': 'Terra184',
+        'FIRMWARE_VERSION': 'v1.0.4',
+        'VENDOR': 'ABB',
+        'INSTALL_DATE': '2024-09-01',
+        'NETWORK_TYPE': 'LTE',
+        'LOCATION_LAT': 34.0522,
+        'LOCATION_LON': -118.2437,
+        'NUM_CONNECTORS': 2,
+        'MAX_POWER_KW': 150,
+        'LAST_MAINTENANCE_DATE': '2024-12-05',
+        'STATUS_LAST_SEEN': 'Available'
+    },
+    {
+        'CHARGER_ID': 'STN_LA_EXPO_CHG_02',
+        'SITE_ID': 'STN_LA_EXPO',
+        'MODEL': 'Terra184',
+        'FIRMWARE_VERSION': 'v1.0.4',
+        'VENDOR': 'ABB',
+        'INSTALL_DATE': '2024-09-01',
+        'NETWORK_TYPE': 'LTE',
+        'LOCATION_LAT': 34.0522,
+        'LOCATION_LON': -118.2437,
+        'NUM_CONNECTORS': 2,
+        'MAX_POWER_KW': 150,
+        'LAST_MAINTENANCE_DATE': '2024-12-05',
+        'STATUS_LAST_SEEN': 'Maintenance'
+    }
+]
+
+# Generate more sample data to reach 40 chargers
+def generate_sample_chargers():
+    chargers = []
+    for i in range(40):
+        site_id = 'STN_SF_FERRY' if i < 20 else 'STN_LA_EXPO'
+        charger_num = (i % 20) + 1
+        statuses = ['Available', 'Charging', 'Faulted', 'Offline', 'Maintenance']
+        
+        charger = {
+            'CHARGER_ID': f'{site_id}_CHG_{charger_num:02d}',
+            'SITE_ID': site_id,
+            'MODEL': 'Terra184',
+            'FIRMWARE_VERSION': 'v1.0.4',
+            'VENDOR': 'ABB',
+            'INSTALL_DATE': '2024-09-01',
+            'NETWORK_TYPE': 'LTE',
+            'LOCATION_LAT': 37.7957980284918 if site_id == 'STN_SF_FERRY' else 34.0522,
+            'LOCATION_LON': -122.3937829585807 if site_id == 'STN_SF_FERRY' else -118.2437,
+            'NUM_CONNECTORS': 2,
+            'MAX_POWER_KW': 150,
+            'LAST_MAINTENANCE_DATE': '2024-12-05',
+            'STATUS_LAST_SEEN': statuses[i % len(statuses)]
         }
-    except:
-        return {
-            'account': os.getenv('SNOWFLAKE_ACCOUNT'),
-            'user': os.getenv('SNOWFLAKE_USERNAME'),
-            'password': os.getenv('SNOWFLAKE_PASSWORD'),
-            'database': os.getenv('SNOWFLAKE_DATABASE'),
-            'schema': os.getenv('SNOWFLAKE_SCHEMA', 'PUBLIC'),
-            'warehouse': os.getenv('SNOWFLAKE_WAREHOUSE'),
-            'role': os.getenv('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
-        }
+        chargers.append(charger)
+    return chargers
 
 @st.cache_data(ttl=300)
 def fetch_charger_data():
-    try:
-        config = get_snowflake_config()
-        conn = sf.connect(**config)
-        cursor = conn.cursor(DictCursor)
-        cursor.execute("SELECT * FROM CHARGERS")
-        results = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return results
-    except Exception as e:
-        st.error(f"Failed to connect to Snowflake: {str(e)}")
-        return []
+    # For now, return sample data
+    # In production, this would connect to Snowflake
+    return generate_sample_chargers()
 
 def calculate_metrics(chargers):
     if not chargers:
@@ -182,28 +242,12 @@ def main():
     # Header
     st.markdown('<h1 class="main-header">🐦 Pigeon - EV Charging Platform</h1>', unsafe_allow_html=True)
     
-    # Check configuration
-    config = get_snowflake_config()
-    missing_vars = [key for key, value in config.items() if not value]
-    if missing_vars:
-        st.error(f"Missing configuration: {', '.join(missing_vars)}")
-        st.info("Please set the following in your deployment platform:")
-        st.code("""
-# For Streamlit Cloud, add to secrets:
-SNOWFLAKE_ACCOUNT = "your_account"
-SNOWFLAKE_USERNAME = "your_username"
-SNOWFLAKE_PASSWORD = "your_password"
-SNOWFLAKE_DATABASE = "your_database"
-SNOWFLAKE_WAREHOUSE = "your_warehouse"
-        """)
-        return
-    
     # Fetch data
-    with st.spinner('Loading charger data from Snowflake...'):
+    with st.spinner('Loading charger data...'):
         chargers = fetch_charger_data()
     
     if not chargers:
-        st.error("No charger data available. Please check your Snowflake connection.")
+        st.error("No charger data available.")
         return
     
     # Calculate metrics
@@ -419,7 +463,6 @@ SNOWFLAKE_WAREHOUSE = "your_warehouse"
     st.markdown(
         f"<div style='text-align: center; color: #6b7280;'>"
         f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-        f"Data source: Snowflake Database | "
         f"Total Chargers: {metrics['total_chargers']} | "
         f"🐦 Pigeon EV Charging Platform"
         f"</div>", 
