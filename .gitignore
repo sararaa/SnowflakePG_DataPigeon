@@ -34,3 +34,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# secrets and sensitive files
+*.log
+.streamlit/
+secrets.toml
+snowflake.log
+*.pem
+*.key
+*.crt
