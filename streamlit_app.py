@@ -4,7 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
-import snowflake.connector
+import snowflake.connector as sf
 from snowflake.connector import DictCursor
 import time
 
@@ -85,7 +85,7 @@ def get_snowflake_config():
 def fetch_charger_data():
     try:
         config = get_snowflake_config()
-        conn = snowflake.connector.connect(**config)
+        conn = sf.connect(**config)
         cursor = conn.cursor(DictCursor)
         cursor.execute("SELECT * FROM CHARGERS")
         results = cursor.fetchall()
