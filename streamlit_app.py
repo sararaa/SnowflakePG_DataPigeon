@@ -18,30 +18,81 @@ st.set_page_config(
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        background: linear-gradient(90deg, #3b82f6, #06b6d4);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 2rem;
+        font-weight: 600;
+        color: #1f2937;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
+        padding: 0.5rem 0;
     }
     
     .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: white;
         padding: 1.5rem;
-        border-radius: 12px;
-        color: white;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
         text-align: center;
         margin: 0.5rem 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
     
-    .status-available { color: #10b981; font-weight: bold; }
-    .status-charging { color: #3b82f6; font-weight: bold; }
-    .status-faulted { color: #ef4444; font-weight: bold; }
-    .status-offline { color: #6b7280; font-weight: bold; }
-    .status-maintenance { color: #f59e0b; font-weight: bold; }
+    .status-available { color: #059669; font-weight: 500; }
+    .status-charging { color: #2563eb; font-weight: 500; }
+    .status-faulted { color: #dc2626; font-weight: 500; }
+    .status-offline { color: #6b7280; font-weight: 500; }
+    .status-maintenance { color: #d97706; font-weight: 500; }
+    
+    .nav-button {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0.5rem 1rem;
+        margin: 0.25rem 0;
+        width: 100%;
+        text-align: left;
+        font-weight: 500;
+        color: #374151;
+        transition: all 0.2s;
+    }
+    
+    .nav-button:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+    }
+    
+    .nav-button.active {
+        background: #3b82f6;
+        color: white;
+        border-color: #3b82f6;
+    }
+    
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .filter-section {
+        background: #f9fafb;
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .stSelectbox > div > div {
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+    }
+    
+    .stDataFrame {
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -239,9 +290,6 @@ def create_power_chart(chargers):
     return fig
 
 def main():
-    # Header
-    st.markdown('<h1 class="main-header">🐦 Pigeon - EV Charging Platform</h1>', unsafe_allow_html=True)
-    
     # Fetch data
     with st.spinner('Loading charger data...'):
         chargers = fetch_charger_data()
@@ -254,23 +302,23 @@ def main():
     metrics = calculate_metrics(chargers)
     
     # Sidebar Navigation
-    st.sidebar.title("🐦 Pigeon")
+    st.sidebar.markdown("## 🐦 Pigeon")
+    st.sidebar.markdown("EV Charging Platform")
     st.sidebar.markdown("---")
     
-    page = st.sidebar.selectbox(
-        "Select Page",
-        ["Dashboard", "Locations", "Sessions", "Tickets", "Alerts"]
-    )
+    # Navigation buttons
+    pages = ["Dashboard", "Locations", "Sessions", "Tickets", "Alerts"]
+    page = st.sidebar.radio("", pages, index=0)
     
     # Filter options
-    st.sidebar.markdown("### 🔍 Filters")
+    st.sidebar.markdown("### Filters")
     site_filter = st.sidebar.selectbox(
-        "Filter by Site",
+        "Site",
         ["All"] + list(set(c.get('SITE_ID', '') for c in chargers))
     )
     
     status_filter = st.sidebar.selectbox(
-        "Filter by Status", 
+        "Status", 
         ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers))
     )
     
@@ -284,7 +332,7 @@ def main():
     # Page Content
     if page == "Dashboard":
         # Main dashboard
-        st.markdown("## 📊 Dashboard Overview")
+        st.markdown('<h2 class="section-header">Dashboard Overview</h2>', unsafe_allow_html=True)
         
         # Key metrics
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -340,7 +388,7 @@ def main():
                 st.plotly_chart(power_chart, use_container_width=True)
     
     elif page == "Locations":
-        st.markdown("## 📍 Charging Locations")
+        st.markdown('<h2 class="section-header">Charging Locations</h2>', unsafe_allow_html=True)
         
         if filtered_chargers:
             # Group chargers by site
@@ -355,43 +403,65 @@ def main():
                     }
                 site_map[site_id]['chargers'].append(charger)
             
+            # Show site overview
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Sites", len(site_map))
+            with col2:
+                total_chargers = sum(len(site['chargers']) for site in site_map.values())
+                st.metric("Total Chargers", total_chargers)
+            with col3:
+                active_chargers = sum(len([c for c in site['chargers'] if c.get('STATUS_LAST_SEEN') in ['Available', 'Charging']]) for site in site_map.values())
+                st.metric("Active Chargers", active_chargers)
+            with col4:
+                total_power = sum(sum(c.get('MAX_POWER_KW', 0) for c in site['chargers']) for site in site_map.values())
+                st.metric("Total Power", f"{total_power} kW")
+            
+            st.markdown("---")
+            
+            # Site details
             for site_id, site_data in site_map.items():
-                with st.expander(f"📍 {site_data['name']} ({len(site_data['chargers'])} chargers)", expanded=True):
-                    # Site metrics
-                    site_chargers = site_data['chargers']
-                    active = len([c for c in site_chargers if c.get('STATUS_LAST_SEEN') in ['Available', 'Charging']])
-                    total_power = sum(c.get('MAX_POWER_KW', 0) for c in site_chargers)
-                    uptime = (active / len(site_chargers) * 100) if site_chargers else 0
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Chargers", len(site_chargers))
-                    with col2:
-                        st.metric("Active", active)
-                    with col3:
-                        st.metric("Uptime", f"{uptime:.1f}%")
-                    with col4:
-                        st.metric("Total Power", f"{total_power} kW")
-                    
-                    # Charger details
-                    df_data = []
-                    for charger in site_chargers:
-                        df_data.append({
-                            'Charger ID': charger.get('CHARGER_ID', ''),
-                            'Model': charger.get('MODEL', ''),
-                            'Power (kW)': charger.get('MAX_POWER_KW', 0),
-                            'Status': charger.get('STATUS_LAST_SEEN', ''),
-                            'Firmware': charger.get('FIRMWARE_VERSION', ''),
-                        })
-                    
-                    if df_data:
-                        df = pd.DataFrame(df_data)
-                        st.dataframe(df, use_container_width=True)
+                st.markdown(f"### {site_data['name']}")
+                
+                # Site metrics
+                site_chargers = site_data['chargers']
+                active = len([c for c in site_chargers if c.get('STATUS_LAST_SEEN') in ['Available', 'Charging']])
+                total_power = sum(c.get('MAX_POWER_KW', 0) for c in site_chargers)
+                uptime = (active / len(site_chargers) * 100) if site_chargers else 0
+                
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Chargers", len(site_chargers))
+                with col2:
+                    st.metric("Active", active)
+                with col3:
+                    st.metric("Uptime", f"{uptime:.1f}%")
+                with col4:
+                    st.metric("Power", f"{total_power} kW")
+                
+                # Charger details
+                df_data = []
+                for charger in site_chargers:
+                    status = charger.get('STATUS_LAST_SEEN', '')
+                    status_class = f"status-{status.lower()}" if status else ""
+                    df_data.append({
+                        'Charger ID': charger.get('CHARGER_ID', ''),
+                        'Model': charger.get('MODEL', ''),
+                        'Power (kW)': charger.get('MAX_POWER_KW', 0),
+                        'Status': status,
+                        'Firmware': charger.get('FIRMWARE_VERSION', ''),
+                    })
+                
+                if df_data:
+                    df = pd.DataFrame(df_data)
+                    st.dataframe(df, use_container_width=True)
+                
+                st.markdown("---")
         else:
             st.warning("No chargers match the selected filters.")
     
     elif page == "Sessions":
-        st.markdown("## 🔌 Charging Sessions")
+        st.markdown('<h2 class="section-header">Charging Sessions</h2>', unsafe_allow_html=True)
         
         # Create sample session data
         sample_sessions = []
@@ -414,7 +484,7 @@ def main():
             st.warning("No sessions available.")
     
     elif page == "Tickets":
-        st.markdown("## 🎫 Maintenance Tickets")
+        st.markdown('<h2 class="section-header">Maintenance Tickets</h2>', unsafe_allow_html=True)
         
         # Create sample ticket data
         sample_tickets = []
@@ -437,7 +507,7 @@ def main():
             st.warning("No tickets available.")
     
     elif page == "Alerts":
-        st.markdown("## 🚨 System Alerts")
+        st.markdown('<h2 class="section-header">System Alerts</h2>', unsafe_allow_html=True)
         
         # Create sample alert data
         sample_alerts = []
@@ -461,10 +531,10 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        f"<div style='text-align: center; color: #6b7280;'>"
-        f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-        f"Total Chargers: {metrics['total_chargers']} | "
-        f"🐦 Pigeon EV Charging Platform"
+        f"<div style='text-align: center; color: #6b7280; font-size: 0.9rem; padding: 1rem 0;'>"
+        f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} • "
+        f"Total Chargers: {metrics['total_chargers']} • "
+        f"Pigeon EV Platform"
         f"</div>", 
         unsafe_allow_html=True
     )
