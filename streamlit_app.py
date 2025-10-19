@@ -10,8 +10,8 @@ import time
 
 # Page configuration
 st.set_page_config(
-    page_title="EV Charging Platform",
-    page_icon="⚡",
+    page_title="Pigeon - EV Charging Platform",
+    page_icon="🐦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -180,7 +180,7 @@ def create_power_chart(chargers):
 
 def main():
     # Header
-    st.markdown('<h1 class="main-header">⚡ EV Charging Platform</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🐦 Pigeon - EV Charging Platform</h1>', unsafe_allow_html=True)
     
     # Check configuration
     config = get_snowflake_config()
@@ -210,7 +210,7 @@ SNOWFLAKE_WAREHOUSE = "your_warehouse"
     metrics = calculate_metrics(chargers)
     
     # Sidebar Navigation
-    st.sidebar.title("🔧 Navigation")
+    st.sidebar.title("🐦 Pigeon")
     st.sidebar.markdown("---")
     
     page = st.sidebar.selectbox(
@@ -420,7 +420,8 @@ SNOWFLAKE_WAREHOUSE = "your_warehouse"
         f"<div style='text-align: center; color: #6b7280;'>"
         f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
         f"Data source: Snowflake Database | "
-        f"Total Chargers: {metrics['total_chargers']}"
+        f"Total Chargers: {metrics['total_chargers']} | "
+        f"🐦 Pigeon EV Charging Platform"
         f"</div>", 
         unsafe_allow_html=True
     )
