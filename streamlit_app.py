@@ -310,29 +310,32 @@ def main():
     pages = ["Dashboard", "Locations", "Sessions", "Tickets", "Alerts"]
     page = st.sidebar.radio("", pages, index=0)
     
-    # Filter options
-    st.sidebar.markdown("### Filters")
-    site_filter = st.sidebar.selectbox(
-        "Site",
-        ["All"] + list(set(c.get('SITE_ID', '') for c in chargers))
-    )
-    
-    status_filter = st.sidebar.selectbox(
-        "Status", 
-        ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers))
-    )
-    
-    # Apply filters
-    filtered_chargers = chargers.copy()
-    if site_filter != "All":
-        filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
-    if status_filter != "All":
-        filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
-    
     # Page Content
     if page == "Dashboard":
         # Main dashboard
         st.markdown('<h2 class="section-header">Dashboard Overview</h2>', unsafe_allow_html=True)
+        
+        # Filters
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            site_filter = st.selectbox(
+                "Filter by Site",
+                ["All"] + list(set(c.get('SITE_ID', '') for c in chargers)),
+                key="dashboard_site_filter"
+            )
+        with col2:
+            status_filter = st.selectbox(
+                "Filter by Status", 
+                ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers)),
+                key="dashboard_status_filter"
+            )
+        
+        # Apply filters
+        filtered_chargers = chargers.copy()
+        if site_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
+        if status_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
         
         # Key metrics
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -389,6 +392,28 @@ def main():
     
     elif page == "Locations":
         st.markdown('<h2 class="section-header">Charging Locations</h2>', unsafe_allow_html=True)
+        
+        # Filters
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            site_filter = st.selectbox(
+                "Filter by Site",
+                ["All"] + list(set(c.get('SITE_ID', '') for c in chargers)),
+                key="locations_site_filter"
+            )
+        with col2:
+            status_filter = st.selectbox(
+                "Filter by Status", 
+                ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers)),
+                key="locations_status_filter"
+            )
+        
+        # Apply filters
+        filtered_chargers = chargers.copy()
+        if site_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
+        if status_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
         
         if filtered_chargers:
             # Group chargers by site
@@ -463,6 +488,28 @@ def main():
     elif page == "Sessions":
         st.markdown('<h2 class="section-header">Charging Sessions</h2>', unsafe_allow_html=True)
         
+        # Filters
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            site_filter = st.selectbox(
+                "Filter by Site",
+                ["All"] + list(set(c.get('SITE_ID', '') for c in chargers)),
+                key="sessions_site_filter"
+            )
+        with col2:
+            status_filter = st.selectbox(
+                "Filter by Status", 
+                ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers)),
+                key="sessions_status_filter"
+            )
+        
+        # Apply filters
+        filtered_chargers = chargers.copy()
+        if site_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
+        if status_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
+        
         # Create sample session data
         sample_sessions = []
         for i, charger in enumerate(filtered_chargers[:10]):
@@ -486,6 +533,28 @@ def main():
     elif page == "Tickets":
         st.markdown('<h2 class="section-header">Maintenance Tickets</h2>', unsafe_allow_html=True)
         
+        # Filters
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            site_filter = st.selectbox(
+                "Filter by Site",
+                ["All"] + list(set(c.get('SITE_ID', '') for c in chargers)),
+                key="tickets_site_filter"
+            )
+        with col2:
+            status_filter = st.selectbox(
+                "Filter by Status", 
+                ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers)),
+                key="tickets_status_filter"
+            )
+        
+        # Apply filters
+        filtered_chargers = chargers.copy()
+        if site_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
+        if status_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
+        
         # Create sample ticket data
         sample_tickets = []
         for i, charger in enumerate(filtered_chargers[:8]):
@@ -508,6 +577,28 @@ def main():
     
     elif page == "Alerts":
         st.markdown('<h2 class="section-header">System Alerts</h2>', unsafe_allow_html=True)
+        
+        # Filters
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            site_filter = st.selectbox(
+                "Filter by Site",
+                ["All"] + list(set(c.get('SITE_ID', '') for c in chargers)),
+                key="alerts_site_filter"
+            )
+        with col2:
+            status_filter = st.selectbox(
+                "Filter by Status", 
+                ["All"] + list(set(c.get('STATUS_LAST_SEEN', '') for c in chargers)),
+                key="alerts_status_filter"
+            )
+        
+        # Apply filters
+        filtered_chargers = chargers.copy()
+        if site_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('SITE_ID') == site_filter]
+        if status_filter != "All":
+            filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
         
         # Create sample alert data
         sample_alerts = []
