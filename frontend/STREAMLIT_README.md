@@ -4,17 +4,22 @@ A modern, clean dashboard for EV charging station management built with Streamli
 
 ## 🚀 Quick Start
 
-1. **Install dependencies**:
+1. **Navigate to frontend directory**:
+```bash
+cd frontend
+```
+
+2. **Install dependencies**:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. **Run the app**:
+3. **Run the app**:
 ```bash
 streamlit run streamlit_app.py
 ```
 
-3. **Open your browser** to `http://localhost:8501`
+4. **Open your browser** to `http://localhost:8501`
 
 ## ✨ Features
 
