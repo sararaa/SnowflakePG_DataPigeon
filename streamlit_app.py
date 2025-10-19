@@ -4,9 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
-from typing import Dict, List, Any
 import snowflake.connector
 from snowflake.connector import DictCursor
+import time
 
 # Page configuration
 st.set_page_config(
@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS to match your Next.js design
 st.markdown("""
 <style>
     .main-header {
@@ -31,11 +31,12 @@ st.markdown("""
     
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 10px;
+        padding: 1.5rem;
+        border-radius: 12px;
         color: white;
         text-align: center;
         margin: 0.5rem 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     
     .status-available { color: #10b981; font-weight: bold; }
@@ -43,13 +44,22 @@ st.markdown("""
     .status-faulted { color: #ef4444; font-weight: bold; }
     .status-offline { color: #6b7280; font-weight: bold; }
     .status-maintenance { color: #f59e0b; font-weight: bold; }
+    
+    .glassmorphism {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+    }
+    
+    .sidebar .sidebar-content {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # Snowflake Configuration
 def get_snowflake_config():
-    """Get Snowflake configuration from environment variables or Streamlit secrets"""
-    # Try Streamlit secrets first (for cloud deployment)
     try:
         return {
             'account': st.secrets['SNOWFLAKE_ACCOUNT'],
@@ -61,7 +71,6 @@ def get_snowflake_config():
             'role': st.secrets.get('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
         }
     except:
-        # Fall back to environment variables (for local development)
         return {
             'account': os.getenv('SNOWFLAKE_ACCOUNT'),
             'user': os.getenv('SNOWFLAKE_USERNAME'),
@@ -72,32 +81,22 @@ def get_snowflake_config():
             'role': os.getenv('SNOWFLAKE_ROLE', 'ACCOUNTADMIN'),
         }
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=300)
 def fetch_charger_data():
-    """Fetch charger data directly from Snowflake"""
     try:
-        # Get configuration
         config = get_snowflake_config()
-        
-        # Create connection
         conn = snowflake.connector.connect(**config)
         cursor = conn.cursor(DictCursor)
-        
-        # Execute query
         cursor.execute("SELECT * FROM CHARGERS")
         results = cursor.fetchall()
-        
-        # Close connection
         cursor.close()
         conn.close()
-        
         return results
     except Exception as e:
         st.error(f"Failed to connect to Snowflake: {str(e)}")
         return []
 
-def calculate_metrics(chargers: List[Dict]) -> Dict[str, Any]:
-    """Calculate key metrics from charger data"""
+def calculate_metrics(chargers):
     if not chargers:
         return {
             'total_chargers': 0,
@@ -114,7 +113,6 @@ def calculate_metrics(chargers: List[Dict]) -> Dict[str, Any]:
     total_power = sum(c.get('MAX_POWER_KW', 0) for c in chargers)
     sites = len(set(c.get('SITE_ID', '') for c in chargers))
     
-    # Status breakdown
     status_counts = {}
     for charger in chargers:
         status = charger.get('STATUS_LAST_SEEN', 'Unknown')
@@ -129,8 +127,7 @@ def calculate_metrics(chargers: List[Dict]) -> Dict[str, Any]:
         'status_breakdown': status_counts
     }
 
-def create_status_chart(status_breakdown: Dict[str, int]):
-    """Create a pie chart for charger status breakdown"""
+def create_status_chart(status_breakdown):
     if not status_breakdown:
         return None
     
@@ -159,12 +156,10 @@ def create_status_chart(status_breakdown: Dict[str, int]):
     
     return fig
 
-def create_power_chart(chargers: List[Dict]):
-    """Create a bar chart for power distribution by site"""
+def create_power_chart(chargers):
     if not chargers:
         return None
     
-    # Group by site and calculate total power
     site_power = {}
     for charger in chargers:
         site = charger.get('SITE_ID', 'Unknown')
@@ -214,11 +209,17 @@ SNOWFLAKE_WAREHOUSE = "your_warehouse"
     # Calculate metrics
     metrics = calculate_metrics(chargers)
     
-    # Sidebar
-    st.sidebar.title("🔧 Controls")
+    # Sidebar Navigation
+    st.sidebar.title("🔧 Navigation")
     st.sidebar.markdown("---")
     
+    page = st.sidebar.selectbox(
+        "Select Page",
+        ["Dashboard", "Locations", "Sessions", "Tickets", "Alerts"]
+    )
+    
     # Filter options
+    st.sidebar.markdown("### 🔍 Filters")
     site_filter = st.sidebar.selectbox(
         "Filter by Site",
         ["All"] + list(set(c.get('SITE_ID', '') for c in chargers))
@@ -236,121 +237,190 @@ SNOWFLAKE_WAREHOUSE = "your_warehouse"
     if status_filter != "All":
         filtered_chargers = [c for c in filtered_chargers if c.get('STATUS_LAST_SEEN') == status_filter]
     
-    # Main dashboard
-    st.markdown("## 📊 Dashboard Overview")
+    # Page Content
+    if page == "Dashboard":
+        # Main dashboard
+        st.markdown("## 📊 Dashboard Overview")
+        
+        # Key metrics
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        with col1:
+            st.metric(
+                label="Total Chargers",
+                value=metrics['total_chargers'],
+                delta=f"{len(filtered_chargers)} filtered"
+            )
+        
+        with col2:
+            st.metric(
+                label="Active Chargers", 
+                value=metrics['active_chargers'],
+                delta=f"{metrics['uptime_percentage']:.1f}% uptime"
+            )
+        
+        with col3:
+            st.metric(
+                label="Total Power",
+                value=f"{metrics['total_power']:,} kW",
+                delta=f"{metrics['total_power']/1000:.1f} MW"
+            )
+        
+        with col4:
+            st.metric(
+                label="Active Sites",
+                value=metrics['sites'],
+                delta="2 locations"
+            )
+        
+        with col5:
+            st.metric(
+                label="System Health",
+                value=f"{metrics['uptime_percentage']:.1f}%",
+                delta="Excellent" if metrics['uptime_percentage'] > 90 else "Good" if metrics['uptime_percentage'] > 75 else "Needs Attention"
+            )
+        
+        st.markdown("---")
+        
+        # Charts section
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            status_chart = create_status_chart(metrics['status_breakdown'])
+            if status_chart:
+                st.plotly_chart(status_chart, use_container_width=True)
+        
+        with col2:
+            power_chart = create_power_chart(chargers)
+            if power_chart:
+                st.plotly_chart(power_chart, use_container_width=True)
     
-    # Key metrics
-    col1, col2, col3, col4, col5 = st.columns(5)
+    elif page == "Locations":
+        st.markdown("## 📍 Charging Locations")
+        
+        if filtered_chargers:
+            # Group chargers by site
+            site_map = {}
+            for charger in filtered_chargers:
+                site_id = charger.get('SITE_ID', 'Unknown')
+                if site_id not in site_map:
+                    site_map[site_id] = {
+                        'id': site_id,
+                        'name': site_id.replace('_', ' ').title(),
+                        'chargers': []
+                    }
+                site_map[site_id]['chargers'].append(charger)
+            
+            for site_id, site_data in site_map.items():
+                with st.expander(f"📍 {site_data['name']} ({len(site_data['chargers'])} chargers)", expanded=True):
+                    # Site metrics
+                    site_chargers = site_data['chargers']
+                    active = len([c for c in site_chargers if c.get('STATUS_LAST_SEEN') in ['Available', 'Charging']])
+                    total_power = sum(c.get('MAX_POWER_KW', 0) for c in site_chargers)
+                    uptime = (active / len(site_chargers) * 100) if site_chargers else 0
+                    
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        st.metric("Total Chargers", len(site_chargers))
+                    with col2:
+                        st.metric("Active", active)
+                    with col3:
+                        st.metric("Uptime", f"{uptime:.1f}%")
+                    with col4:
+                        st.metric("Total Power", f"{total_power} kW")
+                    
+                    # Charger details
+                    df_data = []
+                    for charger in site_chargers:
+                        df_data.append({
+                            'Charger ID': charger.get('CHARGER_ID', ''),
+                            'Model': charger.get('MODEL', ''),
+                            'Power (kW)': charger.get('MAX_POWER_KW', 0),
+                            'Status': charger.get('STATUS_LAST_SEEN', ''),
+                            'Firmware': charger.get('FIRMWARE_VERSION', ''),
+                        })
+                    
+                    if df_data:
+                        df = pd.DataFrame(df_data)
+                        st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("No chargers match the selected filters.")
     
-    with col1:
-        st.metric(
-            label="Total Chargers",
-            value=metrics['total_chargers'],
-            delta=f"{len(filtered_chargers)} filtered"
-        )
-    
-    with col2:
-        st.metric(
-            label="Active Chargers", 
-            value=metrics['active_chargers'],
-            delta=f"{metrics['uptime_percentage']:.1f}% uptime"
-        )
-    
-    with col3:
-        st.metric(
-            label="Total Power",
-            value=f"{metrics['total_power']:,} kW",
-            delta=f"{metrics['total_power']/1000:.1f} MW"
-        )
-    
-    with col4:
-        st.metric(
-            label="Active Sites",
-            value=metrics['sites'],
-            delta="2 locations"
-        )
-    
-    with col5:
-        st.metric(
-            label="System Health",
-            value=f"{metrics['uptime_percentage']:.1f}%",
-            delta="Excellent" if metrics['uptime_percentage'] > 90 else "Good" if metrics['uptime_percentage'] > 75 else "Needs Attention"
-        )
-    
-    st.markdown("---")
-    
-    # Charts section
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Status distribution chart
-        status_chart = create_status_chart(metrics['status_breakdown'])
-        if status_chart:
-            st.plotly_chart(status_chart, use_container_width=True)
-    
-    with col2:
-        # Power distribution chart
-        power_chart = create_power_chart(chargers)
-        if power_chart:
-            st.plotly_chart(power_chart, use_container_width=True)
-    
-    # Charger details table
-    st.markdown("## 🔌 Charger Details")
-    
-    if filtered_chargers:
-        # Create DataFrame for better display
-        df_data = []
-        for charger in filtered_chargers:
-            df_data.append({
+    elif page == "Sessions":
+        st.markdown("## 🔌 Charging Sessions")
+        
+        # Create sample session data
+        sample_sessions = []
+        for i, charger in enumerate(filtered_chargers[:10]):
+            sample_sessions.append({
+                'Session ID': f"SES_{i:06d}",
                 'Charger ID': charger.get('CHARGER_ID', ''),
-                'Site': charger.get('SITE_ID', ''),
-                'Model': charger.get('MODEL', ''),
-                'Vendor': charger.get('VENDOR', ''),
-                'Power (kW)': charger.get('MAX_POWER_KW', 0),
-                'Connectors': charger.get('NUM_CONNECTORS', 0),
-                'Status': charger.get('STATUS_LAST_SEEN', ''),
-                'Firmware': charger.get('FIRMWARE_VERSION', ''),
-                'Last Maintenance': charger.get('LAST_MAINTENANCE_DATE', ''),
-                'Location': f"{charger.get('LOCATION_LAT', 0):.4f}, {charger.get('LOCATION_LON', 0):.4f}"
+                'Vehicle ID': f"VEH_{i:04d}",
+                'Status': ['Active', 'Completed', 'Failed', 'Pending'][i % 4],
+                'Energy (kWh)': round(10 + (i * 5.5), 1),
+                'Duration (min)': 30 + (i * 15),
+                'Start Time': (datetime.now() - timedelta(hours=i*2)).strftime('%Y-%m-%d %H:%M'),
+                'End Time': (datetime.now() - timedelta(hours=i*2-1)).strftime('%Y-%m-%d %H:%M') if i % 4 != 0 else 'Ongoing'
             })
         
-        df = pd.DataFrame(df_data)
+        if sample_sessions:
+            df = pd.DataFrame(sample_sessions)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("No sessions available.")
+    
+    elif page == "Tickets":
+        st.markdown("## 🎫 Maintenance Tickets")
         
-        # Style the status column
-        def style_status(val):
-            if val == 'Available':
-                return 'color: #10b981; font-weight: bold'
-            elif val == 'Charging':
-                return 'color: #3b82f6; font-weight: bold'
-            elif val == 'Faulted':
-                return 'color: #ef4444; font-weight: bold'
-            elif val == 'Offline':
-                return 'color: #6b7280; font-weight: bold'
-            elif val == 'Maintenance':
-                return 'color: #f59e0b; font-weight: bold'
-            else:
-                return ''
+        # Create sample ticket data
+        sample_tickets = []
+        for i, charger in enumerate(filtered_chargers[:8]):
+            sample_tickets.append({
+                'Ticket ID': f"TKT-{i:06d}",
+                'Charger ID': charger.get('CHARGER_ID', ''),
+                'Title': ['Firmware Update Required', 'Maintenance Scheduled', 'Performance Check'][i % 3],
+                'Priority': ['P1-Critical', 'P2-High', 'P3-Medium', 'P4-Low'][i % 4],
+                'Status': ['Open', 'In Progress', 'Resolved', 'Escalated'][i % 4],
+                'Assigned To': ['John Smith', 'Jane Doe'][i % 2],
+                'Created': (datetime.now() - timedelta(days=i*3)).strftime('%Y-%m-%d'),
+                'SLA': '2 days' if i % 4 == 0 else '5 days'
+            })
         
-        styled_df = df.style.applymap(style_status, subset=['Status'])
-        st.dataframe(styled_df, use_container_width=True, height=400)
+        if sample_tickets:
+            df = pd.DataFrame(sample_tickets)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("No tickets available.")
+    
+    elif page == "Alerts":
+        st.markdown("## 🚨 System Alerts")
         
-        # Download button
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="📥 Download Charger Data as CSV",
-            data=csv,
-            file_name=f"charger_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("No chargers match the selected filters.")
+        # Create sample alert data
+        sample_alerts = []
+        for i, charger in enumerate(filtered_chargers[:5]):
+            sample_alerts.append({
+                'Alert ID': f"ALERT_{i:03d}",
+                'Charger ID': charger.get('CHARGER_ID', ''),
+                'Severity': ['WARNING', 'INFO', 'ERROR'][i % 3],
+                'Message': ['Firmware update available', 'Charger operating normally', 'Maintenance required'][i % 3],
+                'Status': 'Unacknowledged' if i % 2 == 0 else 'Acknowledged',
+                'Created': (datetime.now() - timedelta(hours=i)).strftime('%Y-%m-%d %H:%M'),
+                'Actions': 'Acknowledge' if i % 2 == 0 else 'Resolved'
+            })
+        
+        if sample_alerts:
+            df = pd.DataFrame(sample_alerts)
+            st.dataframe(df, use_container_width=True)
+        else:
+            st.warning("No alerts available.")
     
     # Footer
     st.markdown("---")
     st.markdown(
         f"<div style='text-align: center; color: #6b7280;'>"
         f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | "
-        f"Data source: Snowflake Database"
+        f"Data source: Snowflake Database | "
+        f"Total Chargers: {metrics['total_chargers']}"
         f"</div>", 
         unsafe_allow_html=True
     )
