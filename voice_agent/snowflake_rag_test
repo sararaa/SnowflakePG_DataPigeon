@@ -1,0 +1,33 @@
+from snowflake.core import Root
+from snowflake.snowpark import Session
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+CONNECTION_PARAMETERS = {
+    "account": "",  # or just hardcode
+    "user": "",
+    "password": os.environ["SNOWFLAKE_PASS"],
+    "role": "ACCOUNTADMIN",
+    "database": "cortext_search_db",
+    "warehouse": "CORTEXT_SEARCH_WH",
+    "schema": "PUBLIC",
+}
+
+session = Session.builder.configs(CONNECTION_PARAMETERS).create()
+root = Root(session)
+
+search_service = (root
+  .databases["cortex_search_db"]
+  .schemas["public"]
+  .cortex_search_services["chunks_search_service"]
+)
+
+resp = search_service.search(
+  query="My car wont plug into the charger. What could be the issues?",
+  columns=["text"],
+  limit=1
+)
+print(resp.to_json())
